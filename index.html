@@ -156,6 +156,19 @@
     margin:18px 0 6px;
   }
   .group-title:first-child{margin-top:0;}
+  .egift-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .egift-scan-btn{
+    border:1px solid var(--blue-border);
+    background:var(--blue-bg);
+    color:var(--blue-strong);
+    font-size:16px;
+    line-height:1;
+    padding:8px 10px;
+    border-radius:8px;
+    cursor:pointer;
+    min-height:36px;
+  }
+  .egift-scan-btn:active{background:#dce8ff;}
 
   .field-row{
     display:grid;
@@ -303,7 +316,6 @@
   @keyframes spin{to{transform:rotate(360deg);}}
   .scan-status{font-size:13.5px;color:var(--ink-soft);line-height:1.5;}
 
-  .field-row.auto-filled input,
   .egift-row.auto-filled input{
     animation:flash-fill 1.6s ease;
   }
@@ -352,9 +364,7 @@
   </div>
 
   <div class="toolbar">
-    <button class="btn primary" id="scanBtn">📷 日報から読み取る</button>
     <button class="btn" id="resetBtn">入力をクリア</button>
-    <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none;">
   </div>
 
   <div class="meta-row">
@@ -410,7 +420,11 @@
         <div class="field-row"><label>スタバカード</label><input type="number" inputmode="decimal" id="starbucksCard"></div>
         <div class="field-row"><label>雑収入</label><input type="number" inputmode="decimal" id="misc"></div>
 
-        <div class="group-title">eGift 内訳</div>
+        <div class="group-title egift-title-row">
+          <span>eGift 内訳</span>
+          <button class="egift-scan-btn" id="scanBtn" type="button" title="日報から読み取る">📷</button>
+          <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none;">
+        </div>
         <div class="egift-block" id="egiftList"></div>
         <button class="egift-add" id="egiftAdd">+ 金額を追加</button>
         <div class="egift-sum"><span>eGift 合計</span><span id="egiftSumOut">¥0</span></div>
@@ -703,136 +717,12 @@
       .filter(v => !isNaN(v));
   }
 
-  function levenshtein(a, b){
-    const dp = [];
-    for(let i = 0; i <= a.length; i++){ dp.push([i]); }
-    for(let j = 1; j <= b.length; j++){ dp[0][j] = j; }
-    for(let i = 1; i <= a.length; i++){
-      for(let j = 1; j <= b.length; j++){
-        dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] : 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
-      }
-    }
-    return dp[a.length][b.length];
-  }
-
-  // OCRの1文字程度の誤読を許容してラベルを探す(短いラベルは誤爆しやすいので完全一致のみ)
-  function fuzzyIncludes(line, rawLabel){
-    const label = rawLabel.replace(/\s/g, '');
-    if(line.includes(label)) return true;
-    if(label.length < 5) return false;
-    const tol = Math.max(1, Math.floor(label.length * 0.15));
-    for(let len = Math.max(1, label.length - tol); len <= label.length + tol; len++){
-      for(let i = 0; i + len <= line.length; i++){
-        if(levenshtein(line.slice(i, i + len), label) <= tol) return true;
-      }
-    }
-    return false;
-  }
-
-  // 「消費税」の直後に括弧が近接して現れる行だけを税額行とみなし、
-  // 「消費税対象額(...)」のような課税対象額の行(対象額の分だけ間隔が空く)を除外する
-  function taxLineGap(compact){
-    const idx = compact.indexOf('消費税');
-    if(idx === -1) return null;
-    const rest = compact.slice(idx + 3);
-    const parenIdx = rest.search(/[(（]/);
-    if(parenIdx === -1) return null;
-    return parenIdx;
-  }
-
-  function setFieldValue(id, value){
-    const el = $(id);
-    if(!el) return;
-    el.value = value;
-    const row = el.closest('.field-row');
-    if(row){
-      row.classList.remove('auto-filled');
-      void row.offsetWidth;
-      row.classList.add('auto-filled');
-    }
-  }
-
   function applyScanResult(rawText){
     const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-    const filledLabels = new Set();
-    let filledCount = 0;
-
-    // 純売上高(a) と 消費税(b) はラベル自体が誤読されやすいため、
-    // 総売上高(c) と 消費税(標準)+消費税(軽減) の内訳から逆算する
-    let totalSalesC = null;
-    const taxBreakdown = [];
-    lines.forEach(line => {
-      const compact = line.replace(/\s/g, '');
-      if(totalSalesC === null && fuzzyIncludes(compact, '総売上高')){
-        const nums = extractNumbers(line);
-        if(nums.length) totalSalesC = nums[nums.length - 1];
-      }
-      const gap = taxLineGap(compact);
-      if(gap !== null && gap <= 2){
-        const nums = extractNumbers(line);
-        if(nums.length) taxBreakdown.push(nums[nums.length - 1]);
-      }
-    });
-    const resolvedTax = taxBreakdown.length ? taxBreakdown.reduce((a, b) => a + b, 0) : null;
-    const resolvedNetSales = (totalSalesC !== null && resolvedTax !== null) ? totalSalesC - resolvedTax : null;
-    if(resolvedNetSales !== null){ setFieldValue('netSales', resolvedNetSales); filledCount++; filledLabels.add('netSales'); }
-    if(resolvedTax !== null){ setFieldValue('tax', resolvedTax); filledCount++; filledLabels.add('tax'); }
-
-    const singleValueLabels = [
-      ['預り金合計', 'depositTotal'],
-      ['取引件数', 'transactions']
-    ];
-    const rowLabels = [
-      ['その他クレジット', 'otherCredit'],
-      ['Vポイント', 'vpoint'],
-      ['QRコード決済', 'qr'],
-      ['その他電子マネー', 'otherElectronic'],
-      ['施設系ポイント', 'facilityPoint'],
-      ['交通系電子マネー', 'transitElectronic'],
-      ['MOP SBC以外', 'mopSbcOther'],
-      ['MOP SBC', 'mopSbc'],
-      ['スターバックスカード', 'starbucksCard'],
-      ['雑収入', 'misc']
-    ];
     const egiftValues = [];
 
     lines.forEach(line => {
       const compact = line.replace(/\s/g, '');
-
-      for(const [label, id] of singleValueLabels){
-        if(!filledLabels.has(id) && fuzzyIncludes(compact, label)){
-          const nums = extractNumbers(line);
-          if(nums.length){ setFieldValue(id, nums[nums.length - 1]); filledCount++; filledLabels.add(id); }
-          return;
-        }
-      }
-
-      if(!filledLabels.has('cashActual') && compact.startsWith('現金')){
-        const nums = extractNumbers(line);
-        if(nums.length >= 3){
-          setFieldValue('cashActual', nums[2]);
-          filledCount++;
-          filledLabels.add('cashActual');
-          const diff = nums[3];
-          if(diff > 0){ setFieldValue('overReceived', diff); filledCount++; }
-          else if(diff < 0){ setFieldValue('underReceived', Math.abs(diff)); filledCount++; }
-        }
-        return;
-      }
-
-      for(const [label, id] of rowLabels){
-        if(!filledLabels.has(id) && fuzzyIncludes(compact, label)){
-          const nums = extractNumbers(line);
-          if(nums.length){
-            const v = nums.length >= 3 ? nums[2] : nums[nums.length - 1];
-            setFieldValue(id, v);
-            filledCount++;
-            filledLabels.add(id);
-          }
-          return;
-        }
-      }
-
       if(/egi/i.test(compact)){
         const nums = extractNumbers(line);
         if(nums.length){
@@ -842,18 +732,17 @@
       }
     });
 
+    const t = $('toast');
     if(egiftValues.length){
       $('egiftList').innerHTML = '';
       egiftCount = 0;
       egiftValues.forEach(v => addEgiftRow(v));
-      filledCount += egiftValues.length;
+      document.querySelectorAll('.egift-row').forEach(row => row.classList.add('auto-filled'));
+      recalc();
+      t.textContent = 'eGiftを' + egiftValues.length + '件読み取りました。内容を確認してください。';
+    } else {
+      t.textContent = 'eGiftの項目を読み取れませんでした。手入力をお願いします。';
     }
-
-    recalc();
-    const t = $('toast');
-    t.textContent = filledCount > 0
-      ? (filledCount + '件を自動入力しました。内容を確認してください。')
-      : '項目を読み取れませんでした。手入力をお願いします。';
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2600);
   }

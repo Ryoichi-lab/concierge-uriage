@@ -457,10 +457,6 @@
 
   <div class="meta-row">
     <div class="meta-field">
-      <label for="storeDate">日付</label>
-      <input type="date" id="storeDate">
-    </div>
-    <div class="meta-field">
       <label for="storeName">店舗・担当</label>
       <input type="text" id="storeName" placeholder="例：フロント 田中">
     </div>
@@ -703,10 +699,8 @@
   $('resetBtnMobile').addEventListener('click', resetAll);
 
   function copyReport(){
-    const date = $('storeDate').value || '(日付未入力)';
     const store = $('storeName').value || '(店舗・担当未入力)';
     const lines = [
-      '日付: ' + date,
       '店舗・担当: ' + store,
       '客数: ' + $('outCustCount').textContent,
       '現金売上: ' + $('outCashSales').textContent,

@@ -419,6 +419,11 @@
     return isNaN(v) ? 0 : v;
   };
   const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
+  const isEmpty = id => $(id).value.trim() === '';
+  const allEmpty = (...ids) => ids.every(isEmpty);
+  const egiftAllEmpty = () => Array.from(document.querySelectorAll('.egift-input')).every(el => el.value.trim() === '');
+  const yenOrBlank = (empty, n) => empty ? '' : yen(n);
+  const countOrBlank = (empty, n) => empty ? '' : Math.round(n).toLocaleString('ja-JP');
 
   let egiftCount = 0;
   function addEgiftRow(value){
@@ -478,20 +483,27 @@
     const transit = qr + transitElectronic - smart1 - smart2;
     const cashOnHand = cashActual;
 
-    $('egiftSumOut').textContent = yen(eGiftTotal);
-    $('outCustCount').textContent = Math.round(custCount).toLocaleString('ja-JP');
-    $('outCashSales').textContent = yen(cashSales);
-    $('outOnAccount').textContent = yen(onAccount);
-    $('outCredit').textContent = yen(credit);
-    $('outGift').textContent = yen(gift);
-    $('outTransit').textContent = yen(transit);
-    $('outCashOnHand').textContent = yen(cashOnHand);
-    $('outNetSales').textContent = yen(netSales);
-    $('outTax').textContent = yen(tax);
-    $('outDeduction').textContent = yen(depositTotal);
+    const onAccountEmpty = allEmpty('starbucksCard','mopSbcOther','mopSbc','vpoint','misc','overReceived','underReceived') && egiftAllEmpty();
+    const creditEmpty = allEmpty('otherCredit','smart1','smart2','otherElectronic');
+    const transitEmpty = allEmpty('qr','transitElectronic','smart1','smart2');
+    const transactionsEmpty = isEmpty('transactions');
+    const cashActualEmpty = isEmpty('cashActual');
+    const netSalesEmpty = isEmpty('netSales');
 
-    $('tickerNet').textContent = yen(netSales);
-    $('tickerSub').textContent = '客数 ' + Math.round(custCount).toLocaleString('ja-JP') + '名 ／ 取引 ' + Math.round(transactions).toLocaleString('ja-JP') + '件';
+    $('egiftSumOut').textContent = yenOrBlank(egiftAllEmpty(), eGiftTotal);
+    $('outCustCount').textContent = countOrBlank(transactionsEmpty, custCount);
+    $('outCashSales').textContent = yenOrBlank(cashActualEmpty, cashSales);
+    $('outOnAccount').textContent = yenOrBlank(onAccountEmpty, onAccount);
+    $('outCredit').textContent = yenOrBlank(creditEmpty, credit);
+    $('outGift').textContent = yenOrBlank(isEmpty('facilityPoint'), gift);
+    $('outTransit').textContent = yenOrBlank(transitEmpty, transit);
+    $('outCashOnHand').textContent = yenOrBlank(cashActualEmpty, cashOnHand);
+    $('outNetSales').textContent = yenOrBlank(netSalesEmpty, netSales);
+    $('outTax').textContent = yenOrBlank(isEmpty('tax'), tax);
+    $('outDeduction').textContent = yenOrBlank(isEmpty('depositTotal'), depositTotal);
+
+    $('tickerNet').textContent = yenOrBlank(netSalesEmpty, netSales);
+    $('tickerSub').textContent = '客数 ' + (transactionsEmpty ? '−' : Math.round(custCount).toLocaleString('ja-JP')) + '名 ／ 取引 ' + (transactionsEmpty ? '−' : Math.round(transactions).toLocaleString('ja-JP')) + '件';
 
     const badge = $('statusBadge');
     if(overReceived === 0 && underReceived === 0){

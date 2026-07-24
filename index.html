@@ -71,6 +71,16 @@
   .status-bad{background:#3a1e1e;color:#ff9a9a;}
 
   .toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+  .scan-help{
+    font-size:12px;
+    line-height:1.6;
+    color:var(--blue-text);
+    background:var(--blue-bg);
+    border:1px solid var(--blue-border);
+    border-radius:8px;
+    padding:10px 12px;
+    margin-bottom:14px;
+  }
   .btn{
     border:1px solid var(--line);
     background:#fff;
@@ -316,6 +326,78 @@
   @keyframes spin{to{transform:rotate(360deg);}}
   .scan-status{font-size:13.5px;color:var(--ink-soft);line-height:1.5;}
 
+  .camera-overlay{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:#000;
+    z-index:60;
+  }
+  .camera-overlay.show{display:block;}
+  .camera-overlay video{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+  .camera-frame-guide{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%,-50%);
+    width:76vw;
+    max-width:420px;
+    aspect-ratio:1/1.4142;
+    border:3px solid rgba(255,255,255,.9);
+    border-radius:10px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.5);
+    pointer-events:none;
+  }
+  .camera-hint{
+    position:absolute;
+    top:calc(env(safe-area-inset-top, 0px) + 18px);
+    left:0;
+    right:0;
+    text-align:center;
+    color:#fff;
+    font-size:13.5px;
+    padding:0 24px;
+    text-shadow:0 1px 4px rgba(0,0,0,.7);
+    z-index:1;
+  }
+  .camera-controls{
+    position:absolute;
+    bottom:calc(env(safe-area-inset-bottom, 0px) + 26px);
+    left:0;
+    right:0;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:28px;
+    z-index:1;
+  }
+  .camera-capture-btn{
+    width:66px;
+    height:66px;
+    border-radius:50%;
+    background:#fff;
+    border:4px solid rgba(255,255,255,.4);
+    cursor:pointer;
+  }
+  .camera-capture-btn:active{background:#ddd;}
+  .camera-cancel-btn{
+    background:rgba(255,255,255,.15);
+    color:#fff;
+    border:1px solid rgba(255,255,255,.5);
+    border-radius:20px;
+    padding:10px 18px;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .camera-cancel-btn:active{background:rgba(255,255,255,.3);}
+  .camera-controls-spacer{width:74px;}
+
   .field-row.auto-filled input,
   .egift-row.auto-filled input{
     animation:flash-fill 1.6s ease;
@@ -368,6 +450,9 @@
     <button class="btn primary" id="scanBtn">📷 日報から読み取る</button>
     <button class="btn" id="resetBtn">入力をクリア</button>
     <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none;">
+  </div>
+  <div class="scan-help">
+    「📷 日報から読み取る」を押すとカメラが起動します。枠に日報(A4)全体を合わせて撮影すると、純売上高やeGiftなど主要な項目が自動入力されます。読み取れなかった項目や間違っている数字がないか、送信前に必ず確認してください。
   </div>
 
   <div class="meta-row">
@@ -474,6 +559,17 @@
   <div class="scan-box">
     <div class="scan-spinner"></div>
     <div class="scan-status" id="scanStatus">画像を読み込み中...</div>
+  </div>
+</div>
+
+<div class="camera-overlay" id="cameraOverlay">
+  <video id="cameraVideo" autoplay playsinline muted></video>
+  <div class="camera-hint">枠に日報(A4)全体を合わせてください</div>
+  <div class="camera-frame-guide"></div>
+  <div class="camera-controls">
+    <button class="camera-cancel-btn" id="cameraCancelBtn" type="button">キャンセル</button>
+    <button class="camera-capture-btn" id="cameraCaptureBtn" type="button" aria-label="撮影"></button>
+    <div class="camera-controls-spacer"></div>
   </div>
 </div>
 
@@ -649,9 +745,53 @@
   const scanInput = $('scanInput');
   const scanOverlay = $('scanOverlay');
   const scanStatus = $('scanStatus');
+  const cameraOverlay = $('cameraOverlay');
+  const cameraVideo = $('cameraVideo');
+  let cameraStream = null;
 
-  scanBtn.addEventListener('click', () => scanInput.click());
-  $('scanBtnEgift').addEventListener('click', () => scanInput.click());
+  async function openCamera(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      scanInput.click();
+      return;
+    }
+    try{
+      cameraStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      cameraVideo.srcObject = cameraStream;
+      cameraOverlay.classList.add('show');
+    } catch(err){
+      // カメラ権限が無い/非対応の場合はネイティブカメラ(ファイル選択)にフォールバック
+      scanInput.click();
+    }
+  }
+
+  function closeCamera(){
+    if(cameraStream){
+      cameraStream.getTracks().forEach(t => t.stop());
+      cameraStream = null;
+    }
+    cameraVideo.srcObject = null;
+    cameraOverlay.classList.remove('show');
+  }
+
+  function captureFromCamera(){
+    const maxWidth = 1800;
+    const scale = Math.min(1, maxWidth / cameraVideo.videoWidth);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(cameraVideo.videoWidth * scale);
+    canvas.height = Math.round(cameraVideo.videoHeight * scale);
+    canvas.getContext('2d').drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    closeCamera();
+    runOcr(dataUrl);
+  }
+
+  scanBtn.addEventListener('click', openCamera);
+  $('scanBtnEgift').addEventListener('click', openCamera);
+  $('cameraCaptureBtn').addEventListener('click', captureFromCamera);
+  $('cameraCancelBtn').addEventListener('click', closeCamera);
 
   scanInput.addEventListener('change', async () => {
     const file = scanInput.files[0];
@@ -659,10 +799,15 @@
     if(!file) return;
     scanOverlay.classList.add('show');
     scanStatus.textContent = '画像を読み込み中...';
+    const dataUrl = await downscaleImage(file, 1800);
+    await runOcr(dataUrl);
+  });
+
+  async function runOcr(dataUrl){
+    scanOverlay.classList.add('show');
+    scanStatus.textContent = '文字を認識中...';
     let worker;
     try{
-      const dataUrl = await downscaleImage(file, 1800);
-      scanStatus.textContent = '文字を認識中...';
       worker = await Tesseract.createWorker('jpn+eng', 1, {
         workerPath: 'vendor/tesseract/worker.min.js',
         corePath: 'vendor/tesseract/tesseract-core-simd-lstm.wasm.js',
@@ -682,7 +827,7 @@
       if(worker) await worker.terminate();
       scanOverlay.classList.remove('show');
     }
-  });
+  }
 
   function downscaleImage(file, maxWidth){
     return new Promise((resolve, reject) => {

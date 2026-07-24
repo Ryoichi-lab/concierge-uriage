@@ -338,35 +338,35 @@
       <div class="panel-body">
 
         <div class="group-title">基本情報</div>
-        <div class="field-row"><label>純売上高</label><input type="number" inputmode="decimal" id="netSales" value="0"></div>
-        <div class="field-row"><label>消費税</label><input type="number" inputmode="decimal" id="tax" value="0"></div>
-        <div class="field-row"><label>預り金合計</label><input type="number" inputmode="decimal" id="depositTotal" value="0"></div>
-        <div class="field-row"><label>取引件数</label><input type="number" inputmode="decimal" id="transactions" value="0"></div>
+        <div class="field-row"><label>純売上高</label><input type="number" inputmode="decimal" id="netSales"></div>
+        <div class="field-row"><label>消費税</label><input type="number" inputmode="decimal" id="tax"></div>
+        <div class="field-row"><label>預り金合計</label><input type="number" inputmode="decimal" id="depositTotal"></div>
+        <div class="field-row"><label>取引件数</label><input type="number" inputmode="decimal" id="transactions"></div>
 
         <div class="group-title">現金</div>
-        <div class="field-row"><label>実在高（現金）</label><input type="number" inputmode="decimal" id="cashActual" value="0"></div>
+        <div class="field-row"><label>実在高（現金）</label><input type="number" inputmode="decimal" id="cashActual"></div>
         <div class="field-row">
           <label>もらいすぎ (+)<span class="hint">釣銭を多く渡した分</span></label>
-          <input type="number" inputmode="decimal" class="adjust" id="overReceived" value="0">
+          <input type="number" inputmode="decimal" class="adjust" id="overReceived">
         </div>
         <div class="field-row">
           <label>もらい忘れ (-)<span class="hint">釣銭を渡し忘れた分</span></label>
-          <input type="number" inputmode="decimal" class="adjust" id="underReceived" value="0">
+          <input type="number" inputmode="decimal" class="adjust" id="underReceived">
         </div>
 
         <div class="group-title">キャッシュレス決済内訳</div>
-        <div class="field-row"><label>その他クレジット</label><input type="number" inputmode="decimal" id="otherCredit" value="0"></div>
-        <div class="field-row"><label>smartcode 1</label><input type="number" inputmode="decimal" id="smart1" value="0"></div>
-        <div class="field-row"><label>smartcode 2</label><input type="number" inputmode="decimal" id="smart2" value="0"></div>
-        <div class="field-row"><label>Vポイント</label><input type="number" inputmode="decimal" id="vpoint" value="0"></div>
-        <div class="field-row"><label>MOP SBC</label><input type="number" inputmode="decimal" id="mopSbc" value="0"></div>
-        <div class="field-row"><label>QRコード</label><input type="number" inputmode="decimal" id="qr" value="0"></div>
-        <div class="field-row"><label>その他電子</label><input type="number" inputmode="decimal" id="otherElectronic" value="0"></div>
-        <div class="field-row"><label>施設ポイント</label><input type="number" inputmode="decimal" id="facilityPoint" value="0"></div>
-        <div class="field-row"><label>交通系電子</label><input type="number" inputmode="decimal" id="transitElectronic" value="0"></div>
-        <div class="field-row"><label>MOPSBC以外</label><input type="number" inputmode="decimal" id="mopSbcOther" value="0"></div>
-        <div class="field-row"><label>スタバカード</label><input type="number" inputmode="decimal" id="starbucksCard" value="0"></div>
-        <div class="field-row"><label>雑収入</label><input type="number" inputmode="decimal" id="misc" value="0"></div>
+        <div class="field-row"><label>その他クレジット</label><input type="number" inputmode="decimal" id="otherCredit"></div>
+        <div class="field-row"><label>smartcode 1</label><input type="number" inputmode="decimal" id="smart1"></div>
+        <div class="field-row"><label>smartcode 2</label><input type="number" inputmode="decimal" id="smart2"></div>
+        <div class="field-row"><label>Vポイント</label><input type="number" inputmode="decimal" id="vpoint"></div>
+        <div class="field-row"><label>MOP SBC</label><input type="number" inputmode="decimal" id="mopSbc"></div>
+        <div class="field-row"><label>QRコード</label><input type="number" inputmode="decimal" id="qr"></div>
+        <div class="field-row"><label>その他電子</label><input type="number" inputmode="decimal" id="otherElectronic"></div>
+        <div class="field-row"><label>施設ポイント</label><input type="number" inputmode="decimal" id="facilityPoint"></div>
+        <div class="field-row"><label>交通系電子</label><input type="number" inputmode="decimal" id="transitElectronic"></div>
+        <div class="field-row"><label>MOPSBC以外</label><input type="number" inputmode="decimal" id="mopSbcOther"></div>
+        <div class="field-row"><label>スタバカード</label><input type="number" inputmode="decimal" id="starbucksCard"></div>
+        <div class="field-row"><label>雑収入</label><input type="number" inputmode="decimal" id="misc"></div>
 
         <div class="group-title">eGift 内訳</div>
         <div class="egift-block" id="egiftList"></div>
@@ -427,7 +427,7 @@
     row.className = 'egift-row';
     row.innerHTML =
       '<label>金種 ' + egiftCount + '</label>' +
-      '<input type="number" inputmode="decimal" class="egift-input" value="' + (value || 0) + '">' +
+      '<input type="number" inputmode="decimal" class="egift-input" value="' + (value == null ? '' : value) + '">' +
       '<button class="egift-remove" title="削除" aria-label="この行を削除">×</button>';
     $('egiftList').appendChild(row);
     row.querySelector('input').addEventListener('input', recalc);
@@ -436,7 +436,7 @@
       recalc();
     });
   }
-  $('egiftAdd').addEventListener('click', () => { addEgiftRow(0); recalc(); });
+  $('egiftAdd').addEventListener('click', () => { addEgiftRow(); recalc(); });
 
   function egiftSum(){
     let sum = 0;
@@ -520,8 +520,8 @@
 
   function resetAll(){
     if(!confirm('入力内容をすべてクリアします。よろしいですか？')) return;
-    document.querySelectorAll('input[type="number"]:not(.egift-input)').forEach(el => el.value = 0);
-    document.querySelectorAll('.egift-input').forEach(el => el.value = 0);
+    document.querySelectorAll('input[type="number"]:not(.egift-input)').forEach(el => el.value = '');
+    document.querySelectorAll('.egift-input').forEach(el => el.value = '');
     $('storeName').value = '';
     recalc();
   }
@@ -566,7 +566,7 @@
     });
   });
 
-  addEgiftRow(0);
+  addEgiftRow();
   recalc();
 </script>
 </body>

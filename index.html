@@ -156,7 +156,16 @@
     margin:18px 0 6px;
   }
   .group-title:first-child{margin-top:0;}
-  .egift-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .egift-hint{
+    font-size:12px;
+    color:var(--blue-strong);
+    background:var(--blue-bg);
+    border:1px solid var(--blue-border);
+    border-radius:8px;
+    padding:8px 10px;
+    margin:18px 0 6px;
+  }
+  .egift-title-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;}
   .egift-scan-btn{
     border:1px solid var(--blue-border);
     background:var(--blue-bg);
@@ -420,6 +429,7 @@
         <div class="field-row"><label>スタバカード</label><input type="number" inputmode="decimal" id="starbucksCard"></div>
         <div class="field-row"><label>雑収入</label><input type="number" inputmode="decimal" id="misc"></div>
 
+        <div class="egift-hint">📷 eGiftだけ、日報の写真から自動で読み込めます</div>
         <div class="group-title egift-title-row">
           <span>eGift 内訳</span>
           <button class="egift-scan-btn" id="scanBtn" type="button" title="日報から読み取る">📷</button>

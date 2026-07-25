@@ -220,35 +220,6 @@
     box-shadow:0 0 0 3px rgba(161,42,42,.12);
   }
 
-  .egift-block{margin-top:4px;}
-  .egift-row{display:grid;grid-template-columns:1fr 112px 40px;gap:8px;align-items:center;padding:6px 0;}
-  .egift-row input{padding:9px 8px;}
-  .egift-remove{
-    border:none;background:#f4f5f7;color:var(--ink-soft);cursor:pointer;
-    font-size:18px;line-height:1;padding:0;
-    width:40px;height:40px;border-radius:8px;
-  }
-  .egift-remove:active{background:var(--warn-bg);color:var(--warn-text);}
-  .egift-add{
-    margin-top:8px;
-    font-size:13.5px;
-    background:none;
-    border:1px dashed var(--blue-border);
-    color:var(--blue-strong);
-    padding:10px 12px;
-    border-radius:8px;
-    cursor:pointer;
-    width:100%;
-    min-height:44px;
-  }
-  .egift-add:active{background:var(--blue-bg);}
-  .egift-sum{
-    display:flex;justify-content:space-between;
-    font-size:13.5px;color:var(--ink-soft);
-    padding-top:10px;margin-top:6px;border-top:1px dashed var(--line);
-  }
-  .egift-sum span:last-child{font-family:"SFMono-Regular",Consolas,Menlo,monospace;color:var(--ink);font-weight:700;}
-
   .out-row{
     display:grid;
     grid-template-columns:1fr 128px;
@@ -398,8 +369,7 @@
   .camera-cancel-btn:active{background:rgba(255,255,255,.3);}
   .camera-controls-spacer{width:74px;}
 
-  .field-row.auto-filled input,
-  .egift-row.auto-filled input{
+  .field-row.auto-filled input{
     animation:flash-fill 1.6s ease;
   }
   @keyframes flash-fill{
@@ -505,12 +475,10 @@
         <div class="field-row"><label>雑収入</label><input type="number" inputmode="decimal" id="misc"></div>
 
         <div class="group-title egift-title-row">
-          <span>eGift 内訳</span>
+          <span>eGift</span>
           <button class="egift-scan-btn" id="scanBtnEgift" type="button" title="日報から読み取る">📷</button>
         </div>
-        <div class="egift-block" id="egiftList"></div>
-        <button class="egift-add" id="egiftAdd">+ 金額を追加</button>
-        <div class="egift-sum"><span>eGift 合計</span><span id="egiftSumOut">¥0</span></div>
+        <div class="field-row"><label>eGift合計</label><input type="number" inputmode="decimal" id="egift"></div>
 
       </div>
     </div>
@@ -579,36 +547,8 @@
   const yen = n => '¥' + Math.round(n).toLocaleString('ja-JP');
   const isEmpty = id => $(id).value.trim() === '';
   const allEmpty = (...ids) => ids.every(isEmpty);
-  const egiftAllEmpty = () => Array.from(document.querySelectorAll('.egift-input')).every(el => el.value.trim() === '');
   const yenOrBlank = (empty, n) => empty ? '' : yen(n);
   const countOrBlank = (empty, n) => empty ? '' : Math.round(n).toLocaleString('ja-JP');
-
-  let egiftCount = 0;
-  function addEgiftRow(value){
-    egiftCount++;
-    const row = document.createElement('div');
-    row.className = 'egift-row';
-    row.innerHTML =
-      '<label>金種 ' + egiftCount + '</label>' +
-      '<input type="number" inputmode="decimal" class="egift-input" value="' + (value == null ? '' : value) + '">' +
-      '<button class="egift-remove" title="削除" aria-label="この行を削除">×</button>';
-    $('egiftList').appendChild(row);
-    row.querySelector('input').addEventListener('input', recalc);
-    row.querySelector('.egift-remove').addEventListener('click', () => {
-      row.remove();
-      recalc();
-    });
-  }
-  $('egiftAdd').addEventListener('click', () => { addEgiftRow(); recalc(); });
-
-  function egiftSum(){
-    let sum = 0;
-    document.querySelectorAll('.egift-input').forEach(el => {
-      const v = parseFloat(el.value);
-      if(!isNaN(v)) sum += v;
-    });
-    return sum;
-  }
 
   function recalc(){
     const netSales = num('netSales');
@@ -631,7 +571,7 @@
     const mopSbcOther = num('mopSbcOther');
     const starbucksCard = num('starbucksCard');
     const misc = num('misc');
-    const eGiftTotal = egiftSum();
+    const eGiftTotal = num('egift');
 
     const custCount = transactions;
     const cashSales = cashActual;
@@ -641,14 +581,13 @@
     const transit = qr + transitElectronic - smart1 - smart2;
     const cashOnHand = cashActual;
 
-    const onAccountEmpty = allEmpty('starbucksCard','mopSbcOther','mopSbc','vpoint','misc','overReceived','underReceived') && egiftAllEmpty();
+    const onAccountEmpty = allEmpty('starbucksCard','mopSbcOther','mopSbc','vpoint','misc','overReceived','underReceived','egift');
     const creditEmpty = allEmpty('otherCredit','smart1','smart2','otherElectronic');
     const transitEmpty = allEmpty('qr','transitElectronic','smart1','smart2');
     const transactionsEmpty = isEmpty('transactions');
     const cashActualEmpty = isEmpty('cashActual');
     const netSalesEmpty = isEmpty('netSales');
 
-    $('egiftSumOut').textContent = yenOrBlank(egiftAllEmpty(), eGiftTotal);
     $('outCustCount').textContent = countOrBlank(transactionsEmpty, custCount);
     $('outCashSales').textContent = yenOrBlank(cashActualEmpty, cashSales);
     $('outOnAccount').textContent = yenOrBlank(onAccountEmpty, onAccount);
@@ -673,7 +612,7 @@
     }
   }
 
-  document.querySelectorAll('input[type="number"]:not(.egift-input)').forEach(el => {
+  document.querySelectorAll('input[type="number"]').forEach(el => {
     el.addEventListener('input', recalc);
   });
 
@@ -690,8 +629,7 @@
 
   function resetAll(){
     if(!confirm('入力内容をすべてクリアします。よろしいですか？')) return;
-    document.querySelectorAll('input[type="number"]:not(.egift-input)').forEach(el => el.value = '');
-    document.querySelectorAll('.egift-input').forEach(el => el.value = '');
+    document.querySelectorAll('input[type="number"]').forEach(el => el.value = '');
     $('storeName').value = '';
     recalc();
   }
@@ -1037,11 +975,9 @@
     });
 
     if(egiftValues.length){
-      $('egiftList').innerHTML = '';
-      egiftCount = 0;
-      egiftValues.forEach(v => addEgiftRow(v));
-      document.querySelectorAll('.egift-row').forEach(row => row.classList.add('auto-filled'));
-      filledCount += egiftValues.length;
+      const egiftTotal = egiftValues.reduce((a, b) => a + b, 0);
+      setFieldValue('egift', egiftTotal);
+      filledCount++;
     }
 
     recalc();
@@ -1053,7 +989,6 @@
     setTimeout(() => t.classList.remove('show'), 2600);
   }
 
-  addEgiftRow();
   recalc();
 </script>
 </body>

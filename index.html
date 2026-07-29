@@ -405,11 +405,13 @@
 
   <div class="toolbar">
     <button class="btn primary" id="scanBtn">📷 日報から読み取る</button>
+    <button class="btn" id="scanFileBtn">📄 画像/PDFを選択</button>
     <button class="btn" id="resetBtn">入力をクリア</button>
     <input type="file" id="scanInput" accept="image/*" capture="environment" style="display:none;">
+    <input type="file" id="scanInputFile" accept="image/*,application/pdf" style="display:none;">
   </div>
   <div class="scan-help">
-    各項目は「直接入力」または「📷 日報から読み取る」でカメラ撮影して自動入力、どちらでもOKです。日報(A4)全体が写るように撮影すると、純売上高やeGiftなど主要な項目が自動入力されます(smartcode 1/2・雑収入は自動入力の対象外のため手入力してください)。読み取れなかった項目や間違っている数字がないか、送信前に必ず確認してください。
+    各項目は「直接入力」または「📷 日報から読み取る」でカメラ撮影して自動入力、どちらでもOKです。日報(A4)全体が写るように撮影すると、純売上高やeGiftなど主要な項目が自動入力されます(smartcode 1/2・雑収入は自動入力の対象外のため手入力してください)。読み取れなかった項目や間違っている数字がないか、送信前に必ず確認してください。カメラでの撮影がうまくいかない場合は「📄 画像/PDFを選択」から、スキャンした画像やPDFファイルを選んで読み込むこともできます。
   </div>
 
   <div class="meta-row">
@@ -524,6 +526,10 @@
 </div>
 
 <script src="vendor/tesseract/tesseract.min.js"></script>
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdfjs/pdf.worker.min.js';
+</script>
 <script>
   const $ = id => document.getElementById(id);
   const num = id => {
@@ -706,10 +712,13 @@
     runOcr(dataUrl);
   }
 
+  const scanInputFile = $('scanInputFile');
+
   scanBtn.addEventListener('click', openCamera);
   $('scanBtnEgift').addEventListener('click', openCamera);
   $('cameraCaptureBtn').addEventListener('click', captureFromCamera);
   $('cameraCancelBtn').addEventListener('click', closeCamera);
+  $('scanFileBtn').addEventListener('click', () => scanInputFile.click());
 
   scanInput.addEventListener('change', async () => {
     const file = scanInput.files[0];
@@ -721,9 +730,23 @@
     await runOcr(dataUrl);
   });
 
-  async function runOcr(dataUrl){
-    scanOverlay.classList.add('show');
-    scanStatus.textContent = '文字を認識中...';
+  scanInputFile.addEventListener('change', async () => {
+    const file = scanInputFile.files[0];
+    scanInputFile.value = '';
+    if(!file) return;
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if(isPdf){
+      await runOcrPdf(file);
+    } else {
+      scanOverlay.classList.add('show');
+      scanStatus.textContent = '画像を読み込み中...';
+      const dataUrl = await downscaleImage(file, 1800);
+      await runOcr(dataUrl);
+    }
+  });
+
+  // Tesseractワーカーを起動して1枚分のテキストを認識する(呼び出し側でtry/finallyのオーバーレイ制御を行う)
+  async function recognizeText(dataUrl){
     let worker;
     try{
       worker = await Tesseract.createWorker('jpn+eng', 1, {
@@ -738,11 +761,52 @@
         }
       });
       const { data } = await worker.recognize(dataUrl);
-      applyScanResult(data.text);
+      return data.text;
+    } finally {
+      if(worker) await worker.terminate();
+    }
+  }
+
+  async function runOcr(dataUrl){
+    scanOverlay.classList.add('show');
+    scanStatus.textContent = '文字を認識中...';
+    try{
+      const text = await recognizeText(dataUrl);
+      applyScanResult(text);
     } catch(err){
       alert('読み取りに失敗しました: ' + (err && err.message ? err.message : err));
     } finally {
-      if(worker) await worker.terminate();
+      scanOverlay.classList.remove('show');
+    }
+  }
+
+  // スキャンPDFを1ページずつ画像化してOCRし、全ページ分のテキストをまとめて解析する
+  async function runOcrPdf(file){
+    scanOverlay.classList.add('show');
+    scanStatus.textContent = 'PDFを読み込み中...';
+    try{
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let combinedText = '';
+      for(let i = 1; i <= pdf.numPages; i++){
+        scanStatus.textContent = 'PDF ' + i + '/' + pdf.numPages + ' ページを画像化中...';
+        const page = await pdf.getPage(i);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const scale = Math.min(2.5, 1800 / baseViewport.width);
+        const viewport = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(viewport.width);
+        canvas.height = Math.round(viewport.height);
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+        scanStatus.textContent = 'PDF ' + i + '/' + pdf.numPages + ' ページを認識中...';
+        const text = await recognizeText(dataUrl);
+        combinedText += '\n' + text;
+      }
+      applyScanResult(combinedText);
+    } catch(err){
+      alert('PDFの読み取りに失敗しました: ' + (err && err.message ? err.message : err));
+    } finally {
       scanOverlay.classList.remove('show');
     }
   }
